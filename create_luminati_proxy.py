@@ -3,10 +3,13 @@ import paramiko
 import time
 
 # Konfigurasi AWS
-AWS_ACCESS_KEY = 'your-aws-access-key'
-AWS_SECRET_KEY = 'your-aws-secret-key'
-REGION_NAME = 'us-east-1'  # Ganti sesuai region kamu
-KEY_PAIR_NAME = 'PEH'  # Nama key pair yang sudah dibuat di AWS
+aws_region = 'us-east-1'  # Ganti dengan region yang sesuai
+ami_id = 'ami-0e2c8caa4b6378d8c'  # Ganti dengan ID AMI (misalnya Ubuntu 20.04)
+instance_type = 't2.micro'  # Pilih tipe instance yang sesuai
+key_name = 'ORA'  # Ganti dengan nama key pair AWS Anda
+security_group = 'sg-01504071d4ce0bc11'  # Ganti dengan security group yang sesuai
+subnet_id = 'subnet-0a0b40983c77acdc1'  # Ganti dengan ID subnet Anda
+instance_name = 'Proxy-Residensial-EC2'
 
 # Konfigurasi Luminati (Bright Data)
 LUMINATI_USERNAME = 'brd-customer-hl_547a0507-zone-residential_proxy1'
@@ -25,18 +28,23 @@ ec2_client = boto3.client(
 )
 
 # Fungsi untuk membuat EC2 instance
-def create_ec2_instance():
-    print("Membuat instance EC2...")
+def create_instance():
     response = ec2_client.run_instances(
-        ImageId=AMI_ID,
-        InstanceType=INSTANCE_TYPE,
+        ImageId=ami_id,
+        InstanceType=instance_type,
+        KeyName=key_name,
+        SecurityGroupIds=[security_group],
+        SubnetId=subnet_id,
         MinCount=1,
         MaxCount=1,
-        KeyName=KEY_PAIR_NAME,
-        SecurityGroups=['sg-0a9cbad48c2b3455f'],  # Ganti dengan ID security group Anda
+        TagSpecifications=[{
+            'ResourceType': 'instance',
+            'Tags': [{'Key': 'Name', 'Value': instance_name}]
+        }]
     )
+
     instance_id = response['Instances'][0]['InstanceId']
-    print(f"Instance EC2 dengan ID {instance_id} sedang dibuat...")
+    print(f"Instance created: {instance_id}")
     return instance_id
 
 # Fungsi untuk menunggu instance EC2 siap
