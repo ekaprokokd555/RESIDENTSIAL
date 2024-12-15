@@ -1,81 +1,77 @@
 import boto3
-import time
 import paramiko
-import json
+import time
 
-# AWS Credentials
+# Konfigurasi AWS
 AWS_ACCESS_KEY = 'your-aws-access-key'
 AWS_SECRET_KEY = 'your-aws-secret-key'
-REGION_NAME = 'us-east-1'  # Ganti dengan region pilihan kamu
+REGION_NAME = 'us-east-1'  # Ganti sesuai region kamu
+KEY_PAIR_NAME = 'PEH'  # Nama key pair yang sudah dibuat di AWS
 
-# Luminati API Credentials
+# Konfigurasi Luminati (Bright Data)
 LUMINATI_USERNAME = 'brd-customer-hl_547a0507-zone-residential_proxy1'
 LUMINATI_PASSWORD = 'tz9rox7m97if'
 
-# Nama Key Pair untuk EC2 instance
-KEY_PAIR_NAME = 'PEH.pem'
+# AMI ID untuk Ubuntu 20.04 LTS (dapat berbeda sesuai region)
+AMI_ID = 'ami-0e2c8caa4b6378d8c'  # Pastikan ini sesuai dengan region yang kamu pilih
+INSTANCE_TYPE = 't2.micro'  # Tipe instance EC2
 
-# Nama instance EC2 dan jenis
-INSTANCE_TYPE = 't2.micro'
-AMI_ID = 'ami-0e2c8caa4b6378d8c'  # Ubuntu 20.04 LTS AMI ID (periksa sesuai region kamu)
-
-# Inisialisasi boto3 client
+# Membuat koneksi ke AWS
 ec2_client = boto3.client(
-    'ec2', 
+    'ec2',
     aws_access_key_id=AWS_ACCESS_KEY,
     aws_secret_access_key=AWS_SECRET_KEY,
     region_name=REGION_NAME
 )
 
-# Membuat EC2 instance
+# Fungsi untuk membuat EC2 instance
 def create_ec2_instance():
-    print("Creating EC2 instance...")
+    print("Membuat instance EC2...")
     response = ec2_client.run_instances(
         ImageId=AMI_ID,
         InstanceType=INSTANCE_TYPE,
         MinCount=1,
         MaxCount=1,
         KeyName=KEY_PAIR_NAME,
-        SecurityGroups=['default'],  # Ensure that the 'default' security group allows SSH (port 22) and HTTP (port 3128)
+        SecurityGroups=['sg-0a9cbad48c2b3455f'],
     )
     instance_id = response['Instances'][0]['InstanceId']
-    print(f"EC2 instance {instance_id} is being created...")
+    print(f"Instance EC2 dengan ID {instance_id} sedang dibuat...")
     return instance_id
 
-# Menunggu EC2 instance siap
+# Fungsi untuk menunggu instance EC2 siap
 def wait_for_instance(instance_id):
-    print("Waiting for instance to be running...")
+    print("Menunggu instance untuk siap...")
     waiter = ec2_client.get_waiter('instance_running')
     waiter.wait(InstanceIds=[instance_id])
-    print(f"Instance {instance_id} is running.")
+    print(f"Instance EC2 dengan ID {instance_id} sudah berjalan.")
     return instance_id
 
-# Mendapatkan public IP EC2 instance
+# Mendapatkan IP publik instance EC2
 def get_instance_public_ip(instance_id):
     instance = ec2_client.describe_instances(InstanceIds=[instance_id])
     public_ip = instance['Reservations'][0]['Instances'][0]['PublicIpAddress']
-    print(f"Public IP of EC2 instance: {public_ip}")
+    print(f"IP publik EC2 instance: {public_ip}")
     return public_ip
 
-# Mengonfigurasi Squid Proxy di EC2 instance
+# Fungsi untuk mengonfigurasi Squid Proxy di EC2
 def configure_squid_proxy(public_ip):
-    print("Configuring Squid Proxy...")
+    print("Mengonfigurasi Squid Proxy...")
     ssh_client = paramiko.SSHClient()
     ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    
     ssh_client.connect(public_ip, username='ubuntu', key_filename=KEY_PAIR_NAME)
     
-    # Update dan install Squid
+    # Update sistem dan install Squid
     commands = [
         "sudo apt update && sudo apt upgrade -y",
-        "sudo apt install squid -y",
+        "sudo apt install squid -y"
     ]
     
     for command in commands:
         stdin, stdout, stderr = ssh_client.exec_command(command)
         print(stdout.read().decode())
     
-    # Mengonfigurasi Squid untuk menerima koneksi
+    # Konfigurasi Squid untuk menerima koneksi
     squid_conf = """
     http_port 3128
     acl allowed_ips src 0.0.0.0/0
@@ -83,24 +79,24 @@ def configure_squid_proxy(public_ip):
     """
     
     # Update konfigurasi Squid
-    stdin, stdout, stderr = ssh_client.exec_command('echo "{}" | sudo tee /etc/squid/squid.conf'.format(squid_conf))
+    stdin, stdout, stderr = ssh_client.exec_command(f'echo "{squid_conf}" | sudo tee /etc/squid/squid.conf')
     print(stdout.read().decode())
     
-    # Restart Squid untuk menerapkan konfigurasi baru
+    # Restart Squid untuk menerapkan perubahan
     stdin, stdout, stderr = ssh_client.exec_command("sudo systemctl restart squid")
     print(stdout.read().decode())
     
     ssh_client.close()
 
-# Mengonfigurasi Luminati Proxy (Bright Data) untuk digunakan pada Squid
+# Fungsi untuk mengonfigurasi Luminati Proxy di Squid
 def configure_luminati_proxy(public_ip):
-    print("Configuring Luminati Proxy...")
+    print("Mengonfigurasi Luminati Proxy...")
     
-    # Format proxy url untuk Luminati
+    # Format URL untuk Luminati Proxy
     luminati_proxy = f"http://{LUMINATI_USERNAME}-country-us:{LUMINATI_PASSWORD}@zproxy.luminati.io:22225"
-    print(f"Using Luminati Proxy: {luminati_proxy}")
-
-    # Mengonfigurasi Squid untuk menggunakan proxy Luminati sebagai upstream proxy
+    print(f"Pengaturan proxy Luminati: {luminati_proxy}")
+    
+    # SSH ke EC2 dan konfigurasi Squid untuk menggunakan Luminati sebagai proxy upstream
     ssh_client = paramiko.SSHClient()
     ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     ssh_client.connect(public_ip, username='ubuntu', key_filename=KEY_PAIR_NAME)
@@ -110,7 +106,7 @@ def configure_luminati_proxy(public_ip):
     never_direct allow all
     """
 
-    # Menambahkan konfigurasi Luminati ke Squid
+    # Menambahkan pengaturan Luminati ke file konfigurasi Squid
     stdin, stdout, stderr = ssh_client.exec_command(f"echo '{luminati_config}' | sudo tee -a /etc/squid/squid.conf")
     print(stdout.read().decode())
 
@@ -120,24 +116,24 @@ def configure_luminati_proxy(public_ip):
 
     ssh_client.close()
 
+# Fungsi utama untuk menjalankan proses
+def main():
+    # 1. Buat EC2 instance
+    instance_id = create_ec2_instance()
+
+    # 2. Tunggu hingga instance siap
+    instance_id = wait_for_instance(instance_id)
+
+    # 3. Dapatkan IP publik dari EC2 instance
+    public_ip = get_instance_public_ip(instance_id)
+
+    # 4. Konfigurasi Squid Proxy
+    configure_squid_proxy(public_ip)
+
+    # 5. Konfigurasi Luminati Proxy untuk digunakan Squid
+    configure_luminati_proxy(public_ip)
+
+    print(f"Proxy sekarang berjalan pada {public_ip}:3128 dan menggunakan Luminati sebagai proxy upstream.")
+
 if __name__ == "__main__":
-    try:
-        # Step 1: Create EC2 instance
-        instance_id = create_ec2_instance()
-
-        # Step 2: Wait for EC2 instance to be ready
-        instance_id = wait_for_instance(instance_id)
-
-        # Step 3: Get EC2 public IP
-        public_ip = get_instance_public_ip(instance_id)
-
-        # Step 4: Configure Squid Proxy
-        configure_squid_proxy(public_ip)
-
-        # Step 5: Configure Luminati Proxy
-        configure_luminati_proxy(public_ip)
-
-        print(f"Proxy is now running on {public_ip}:3128 and using Luminati as upstream proxy.")
-    
-    except Exception as e:
-        print(f"An error occurred: {e}")
+    main()
