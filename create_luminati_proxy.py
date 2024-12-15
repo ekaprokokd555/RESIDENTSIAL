@@ -31,11 +31,11 @@ ec2_client = boto3.client(
 def create_ec2_instance():
     print("Creating EC2 instance...")
     response = ec2_client.run_instances(
-        ImageId=ami-0e2c8caa4b6378d8c,
-        InstanceType=t2.micro,
+        ImageId=AMI_ID,
+        InstanceType=INSTANCE_TYPE,
         MinCount=1,
         MaxCount=1,
-        KeyName=KPEH,
+        KeyName=KEY_PAIR_NAME,
         SecurityGroups=['sg-0a9cbad48c2b3455f'],
     )
     instance_id = response['Instances'][0]['InstanceId']
