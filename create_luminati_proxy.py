@@ -33,7 +33,7 @@ def create_ec2_instance():
         MinCount=1,
         MaxCount=1,
         KeyName=KEY_PAIR_NAME,
-        SecurityGroups=['sg-0a9cbad48c2b3455f'],
+        SecurityGroups=['sg-0a9cbad48c2b3455f'],  # Ganti dengan ID security group Anda
     )
     instance_id = response['Instances'][0]['InstanceId']
     print(f"Instance EC2 dengan ID {instance_id} sedang dibuat...")
