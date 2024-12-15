@@ -13,11 +13,11 @@ LUMINATI_USERNAME = 'brd-customer-hl_547a0507-zone-residential_proxy1'
 LUMINATI_PASSWORD = 'tz9rox7m97if'
 
 # Nama Key Pair untuk EC2 instance
-KEY_PAIR_NAME = 'your-key-pair.pem'
+KEY_PAIR_NAME = 'PEH.pem'
 
 # Nama instance EC2 dan jenis
 INSTANCE_TYPE = 't2.micro'
-AMI_ID = 'ami-0c55b159cbfafe1f0'  # Ubuntu 20.04 LTS AMI ID (periksa sesuai region kamu)
+AMI_ID = 'ami-0e2c8caa4b6378d8c'  # Ubuntu 20.04 LTS AMI ID (periksa sesuai region kamu)
 
 # Inisialisasi boto3 client
 ec2_client = boto3.client(
@@ -36,7 +36,7 @@ def create_ec2_instance():
         MinCount=1,
         MaxCount=1,
         KeyName=KEY_PAIR_NAME,
-        SecurityGroups=['default'],
+        SecurityGroups=['sg-0a9cbad48c2b3455f'],
     )
     instance_id = response['Instances'][0]['InstanceId']
     print(f"EC2 instance {instance_id} is being created...")
@@ -101,7 +101,7 @@ def configure_luminati_proxy():
     # Mengonfigurasi Squid untuk menggunakan proxy Luminati sebagai upstream proxy
     ssh_client = paramiko.SSHClient()
     ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    ssh_client.connect(public_ip, username='ubuntu', key_filename=KEY_PAIR_NAME)
+    ssh_client.connect(public_ip, username='ubuntu', key_filename=PEH)
 
     luminati_config = f"""
     cache_peer zproxy.luminati.io parent 22225 0 no-query default
