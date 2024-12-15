@@ -9,8 +9,8 @@ AWS_SECRET_KEY = 'your-aws-secret-key'
 REGION_NAME = 'us-east-1'  # Ganti dengan region pilihan kamu
 
 # Luminati API Credentials
-LUMINATI_USERNAME = 'your-luminati-username'
-LUMINATI_PASSWORD = 'your-luminati-password'
+LUMINATI_USERNAME = 'brd-customer-hl_547a0507-zone-residential_proxy1'
+LUMINATI_PASSWORD = 'tz9rox7m97if'
 
 # Nama Key Pair untuk EC2 instance
 KEY_PAIR_NAME = 'your-key-pair.pem'
