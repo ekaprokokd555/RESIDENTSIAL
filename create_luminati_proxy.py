@@ -36,7 +36,7 @@ def create_ec2_instance():
         MinCount=1,
         MaxCount=1,
         KeyName=KEY_PAIR_NAME,
-        SecurityGroups=['default'],
+        SecurityGroups=['default'],  # Ensure that the 'default' security group allows SSH (port 22) and HTTP (port 3128)
     )
     instance_id = response['Instances'][0]['InstanceId']
     print(f"EC2 instance {instance_id} is being created...")
@@ -93,7 +93,9 @@ def configure_squid_proxy(public_ip):
     ssh_client.close()
 
 # Mengonfigurasi Luminati Proxy (Bright Data) untuk digunakan pada Squid
-def configure_luminati_proxy():
+def configure_luminati_proxy(public_ip):
+    print("Configuring Luminati Proxy...")
+    
     # Format proxy url untuk Luminati
     luminati_proxy = f"http://{LUMINATI_USERNAME}-country-us:{LUMINATI_PASSWORD}@zproxy.luminati.io:22225"
     print(f"Using Luminati Proxy: {luminati_proxy}")
@@ -101,7 +103,7 @@ def configure_luminati_proxy():
     # Mengonfigurasi Squid untuk menggunakan proxy Luminati sebagai upstream proxy
     ssh_client = paramiko.SSHClient()
     ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    ssh_client.connect(public_ip, username='ubuntu', key_filename=PEH)
+    ssh_client.connect(public_ip, username='ubuntu', key_filename=KEY_PAIR_NAME)
 
     luminati_config = f"""
     cache_peer zproxy.luminati.io parent 22225 0 no-query default
@@ -119,19 +121,23 @@ def configure_luminati_proxy():
     ssh_client.close()
 
 if __name__ == "__main__":
-    # Step 1: Create EC2 instance
-    instance_id = create_ec2_instance()
+    try:
+        # Step 1: Create EC2 instance
+        instance_id = create_ec2_instance()
 
-    # Step 2: Wait for EC2 instance to be ready
-    instance_id = wait_for_instance(instance_id)
+        # Step 2: Wait for EC2 instance to be ready
+        instance_id = wait_for_instance(instance_id)
 
-    # Step 3: Get EC2 public IP
-    public_ip = get_instance_public_ip(instance_id)
+        # Step 3: Get EC2 public IP
+        public_ip = get_instance_public_ip(instance_id)
 
-    # Step 4: Configure Squid Proxy
-    configure_squid_proxy(public_ip)
+        # Step 4: Configure Squid Proxy
+        configure_squid_proxy(public_ip)
 
-    # Step 5: Configure Luminati Proxy
-    configure_luminati_proxy()
+        # Step 5: Configure Luminati Proxy
+        configure_luminati_proxy(public_ip)
 
-    print(f"Proxy is now running on {public_ip}:3128 and using Luminati as upstream proxy.")
+        print(f"Proxy is now running on {public_ip}:3128 and using Luminati as upstream proxy.")
+    
+    except Exception as e:
+        print(f"An error occurred: {e}")
